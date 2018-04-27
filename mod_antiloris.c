@@ -123,14 +123,21 @@ static int pre_connection(conn_rec *c)
     worker_score *ws_record;
     
     ws_record = &ap_scoreboard_image->servers[sbh->child_num][sbh->thread_num];
-    apr_cpystrn(ws_record->client, c->remote_ip, sizeof(ws_record->client));
+    /* remote_ip -> client_ip */
+    /*apr_cpystrn(ws_record->client, c->remote_ip, sizeof(ws_record->client));*/
+    apr_cpystrn(ws_record->client, c->client_ip, sizeof(ws_record->client));
     
     char *client_ip = ws_record->client;
     
     /* Count up the number of connections we are handling right now from this IP address */
     for (i = 0; i < server_limit; ++i) {
 	for (j = 0; j < thread_limit; ++j) {
-    	    ws_record = ap_get_scoreboard_worker(i, j);
+        /* add if else */
+		#if AP_SERVER_MAJORVERSION_NUMBER == 2 && AP_SERVER_MINORVERSION_NUMBER > 2 
+        		ws_record = ap_get_scoreboard_worker_from_indexes(i, j); 
+		#else 
+    	    		ws_record = ap_get_scoreboard_worker(i, j);
+		#endif
             switch (ws_record->status) {
         	case SERVER_BUSY_READ:
             	    if (strcmp(client_ip, ws_record->client) == 0)
@@ -143,7 +150,9 @@ static int pre_connection(conn_rec *c)
     }
     
     if (ip_count > conf->limit) {
-	ap_log_error(APLOG_MARK, APLOG_WARNING, 0, NULL, "Rejected, too many connections in READ state from %s", c->remote_ip);
+    /* remote_ip -> client_ip */
+	/*ap_log_error(APLOG_MARK, APLOG_WARNING, 0, NULL, "Rejected, too many connections in READ state from %s", c->remote_ip);*/
+	ap_log_error(APLOG_MARK, APLOG_WARNING, 0, NULL, "Rejected, too many connections in READ state from %s", c->client_ip);
 	return OK;
     } else {
 	return DECLINED;
